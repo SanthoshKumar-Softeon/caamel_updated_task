@@ -1,0 +1,83 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:camel="http://camel.apache.org/schema/spring"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+           http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+           http://camel.apache.org/schema/spring https://camel.apache.org/schema/spring/camel-spring.xsd">
+
+	<bean id="oracleDataSource"
+		class="org.apache.commons.dbcp2.BasicDataSource">
+		<property name="driverClassName" value="oracle.jdbc.OracleDriver" />
+		<property name="url" value="jdbc:oracle:thin:@//192.1.2.45:1521/elite19c" />
+		<property name="username" value="s241oradev" />
+		<property name="password" value="s241oradev" />
+
+	</bean>
+
+	<bean id="Cityprocessor"
+		class="com.nettycity.exercise.nettycity_management.Cityprocessor" />
+
+	<camel:camelContext>
+		<camel:restConfiguration
+			component="netty-http" port="8080" host="localhost" bindingMode="json" />
+
+		<camel:rest path="/api/employees">
+			<camel:get>
+				<camel:to uri="direct:getAllEmployees" />
+			</camel:get>
+			<camel:get path="/{id}">
+				<camel:to uri="direct:getEmployeeById" />
+			</camel:get>
+			<camel:post>
+				<camel:param name="body" type="body"
+					description="City data" dataType="json" required="true" />
+				<camel:to uri="direct:addEmployee" />
+			</camel:post>
+			<camel:delete path="/{id}">
+				<camel:to uri="direct:deleteEmployee" />
+			</camel:delete>
+		</camel:rest>
+
+		<camel:route>
+			<camel:from uri="direct:getAllEmployees" />
+			<camel:to
+				uri="sql:SELECT * FROM EMPLOYEES_DTO?dataSource=#oracleDataSource" />
+
+		</camel:route>
+
+		<camel:route>
+			<camel:from uri="direct:getEmployeeById" />
+			<camel:log
+				message="Fetching employee with ID: ${header.id}" />
+			<camel:to    
+				uri="sql:SELECT * FROM EMPLOYEES_DTO WHERE EMPLOYEE_ID = :#id?dataSource=#oracleDataSource" />
+
+		</camel:route>
+
+		<camel:route id="addEmployeeRoute">
+    <camel:from uri="direct:addEmployee" />
+    <camel:log message="Received body: ${body}" />
+   
+    <camel:log message="Converted body to map: ${body}" />
+    <camel:to uri="sql:INSERT INTO EMPLOYEES_DTO (EMPLOYEE_ID, FIRST_NAME, LAST_NAME, EMAIL, SALARY) 
+        VALUES (:#employeeId, :#firstName, :#lastName, :#email, :#salary)?dataSource=#oracleDataSource" />
+    <camel:setBody>
+        <camel:constant>{"success": "Employee added successfully"}</camel:constant>
+    </camel:setBody>
+    <camel:convertBodyTo type="java.lang.String" />
+</camel:route>
+
+
+		<camel:route>
+			<camel:from uri="direct:deleteEmployee" />
+			<camel:log
+				message="Deleting employee with ID: ${header.id}" />
+			<camel:to
+				uri="sql:DELETE FROM EMPLOYEES_DTO WHERE EMPLOYEE_ID = :#id?dataSource=#oracleDataSource" />
+			<camel:setBody>
+				<camel:constant>{"success": "Employee deleted successfully"}</camel:constant>
+			</camel:setBody>
+			<camel:convertBodyTo type="java.lang.String" />
+		</camel:route>
+	</camel:camelContext>
+</beans>

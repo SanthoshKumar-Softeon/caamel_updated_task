@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:camel="http://camel.apache.org/schema/spring"
+       xsi:schemaLocation="
+           http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+           http://camel.apache.org/schema/spring https://camel.apache.org/schema/spring/camel-spring.xsd">
+
+    <!-- Oracle DataSource Configuration -->
+    <bean id="oracleDataSource" class="org.apache.commons.dbcp2.BasicDataSource">
+        <property name="driverClassName" value="oracle.jdbc.OracleDriver" />
+        <property name="url" value="jdbc:oracle:thin:@//192.1.2.45:1521/elite19c" />
+        <property name="username" value="s241oradev" />
+        <property name="password" value="s241oradev" />
+    </bean>
+
+    <camel:camelContext xmlns="http://camel.apache.org/schema/spring">
+    
+        <camel:route id="quartzJobRoute">
+            
+            <camel:from uri="quartz://myScheduler?cron=0+0/2+*+*+*+?" />
+            
+            <camel:to uri="sql:SELECT * FROM EMPLOYEES_DTO?dataSource=#oracleDataSource" />
+            <camel:log message="Query executed successfully! Result: ${body}" />
+            
+            
+            <camel:to uri="sql:UPDATE EMPLOYEES_DTO SET SALARY = SALARY + 5000 WHERE FIRST_NAME = 'Naveen'?dataSource=#oracleDataSource" />
+            <camel:log message="Salary updated successfully for Naveen!" />
+        </camel:route>
+
+        <camel:route id="shutdownTimerRoute">
+            <camel:from uri="timer://shutdownTimer?repeatCount=1&amp;delay=600000" />
+            <camel:log message="Triggering shutdown of the Quartz job route..." />
+            <!-- Trigger stop logic -->
+            <camel:to uri="direct:stopQuartzJob" />
+        </camel:route>
+
+        <camel:route id="stopQuartzJobRoute">
+            <camel:from uri="direct:stopQuartzJob" />
+            <camel:log message="Stopping the Quartz job route..." />
+            <camel:stop />
+        </camel:route>
+    </camel:camelContext>
+</beans>
